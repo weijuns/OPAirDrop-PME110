@@ -127,10 +127,16 @@ dumpsys() { echo 'versionCode=27391 minSdk=36'; }
         self.assertEqual(first.returncode, 0, first.stdout)
         state = self.root/'data/adb/opairshare_pme110'
         backup = (state/'latest-backup').read_text()
+        # Simulate Hybrid Mount's post-install normalization before reinstall.
+        (self.mod/'system/product').rename(self.mod/'product')
+        (self.mod/'system/product').symlink_to('../product')
+        (self.mod/'product/product').symlink_to('./system/product')
         second = self.run_installer()
         self.assertEqual(second.returncode, 0, second.stdout)
         self.assertEqual((state/'latest-backup').read_text(), backup)
         self.assertTrue((Path(backup.strip())/'mosey_stack_pme110/uninstall.sh').is_file())
+        self.assertFalse((self.mod/'system/product').is_symlink())
+        self.assertFalse((self.mod/'product').exists())
 
     def test_wrong_kernel_never_retires_old_modules(self):
         self.environment['TEST_KERNEL'] = 'different-kernel'

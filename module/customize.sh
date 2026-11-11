@@ -46,20 +46,20 @@ if [ -z "$BACKUP" ] || [ ! -f "$BACKUP/bridge.apk" ]; then
     current_bridge=$(/system/bin/pm path com.tlsu.oshareairdrop | sed -n 's/^package://p' | head -n 1)
     cp "$current_bridge" "$BACKUP/bridge.apk" || abort "桥接备份失败"
 fi
-# Also clean the exact stale link if upgrading a previously staged prototype.
-for generated in "$MODPATH/product/product" "$MODPATH/system/product/product"; do
-    if [ -L "$generated" ]; then
-        [ "$(readlink "$generated")" = ./system/product ] || abort "发现未识别的嵌套分区链接"
-        rm "$generated" || abort "无法清理旧的嵌套分区链接"
-    fi
-done
-mkdir -p "$MODPATH/system/product" "$MODPATH/runtime/lib64"
+# Assemble a fresh owned tree before replacing a previously staged metamodule
+# layout. Never normalize the live /data/adb/modules tree during installation.
+[ "$MODPATH" != /data/adb/modules/opairshare_pme110 ] || abort "需要 KernelSU 暂存安装目录"
+PRODUCT_TMP="$MODPATH/.product-import"
+mkdir -p "$PRODUCT_TMP" "$MODPATH/runtime/lib64"
 # Metamodules leave partition links in old trees; import only owned files,
 # never recursively copy that generated layout into a new partition.
 for relative in etc/permissions/privapp-permissions-mosey-vivo.xml etc/permissions/mosey-hiddenapi-vivo.xml etc/vintf/manifest/manifest_mosey.xml priv-app/MoseyApp/base.apk priv-app/MoseyApp/split_config.arm64_v8a.apk priv-app/MoseyApp/split_config.en.apk priv-app/MoseyApp/split_config.xxhdpi.apk; do
-    mkdir -p "$MODPATH/system/product/${relative%/*}"
-    cp "$SYS/$relative" "$MODPATH/system/product/$relative" || abort "导入系统层失败：$relative"
+    mkdir -p "$PRODUCT_TMP/${relative%/*}"
+    cp "$SYS/$relative" "$PRODUCT_TMP/$relative" || abort "导入系统层失败：$relative"
 done
+rm -rf "$MODPATH/system/product" "$MODPATH/product" || abort "无法整理暂存分区布局"
+mkdir -p "$MODPATH/system"
+mv "$PRODUCT_TMP" "$MODPATH/system/product" || abort "无法完成系统层导入"
 cp /data/moapp/mosey_server "$MODPATH/runtime/mosey_server" || abort "导入原厂服务失败"
 cp /data/moapp/lib64/libmosey_daemon_ffi.so "$MODPATH/runtime/lib64/" || abort "导入 FFI 失败"
 # Preserve GMS policy by regenerating copies of known configuration files only.
