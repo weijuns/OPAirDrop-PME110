@@ -7,9 +7,7 @@ import android.os.IBinder;
 import android.util.Log;
 
 import java.lang.reflect.Method;
-import java.lang.reflect.Field;
 import java.net.NetworkInterface;
-import java.util.List;
 import android.net.ConnectivityManager;
 import android.net.LinkProperties;
 import android.net.Network;
@@ -27,6 +25,26 @@ final class NativeNetworkLease {
     private NativeNetworkLease() {}
 
     static boolean ownsSession() { return requested && enabled(); }
+
+    static String diagnostics() {
+        try {
+            Object provider = ProviderHolder.get();
+            Object controller = provider.getClass().getField("a").get(provider);
+            Class<?> type = controller.getClass();
+            Object slot = type.getField("i").get(controller);
+            Object job = slot.getClass().getField("a").get(slot);
+            java.lang.reflect.Field running = type.getDeclaredField("H");
+            running.setAccessible(true);
+            android.net.wifi.WifiManager wifi = (android.net.wifi.WifiManager) type.getField("g").get(controller);
+            ClassLoader loader = ProviderHolder.loader();
+            return "requested=" + requested + " ready=" + realSessionReady()
+                    + " wifi=" + wifi.isWifiEnabled() + " wifiState=" + wifi.getWifiState()
+                    + " controllerRunning=" + running.getBoolean(controller)
+                    + " channels=" + type.getField("o").get(controller)
+                    + " startJob=" + job + " modernStart=" + loader.loadClass("cyp").getMethod("o").invoke(null)
+                    + " completionEvent=" + loader.loadClass("cyz").getMethod("d").invoke(null);
+        } catch (Throwable failure) { return "unavailable=" + failure; }
+    }
 
     private static boolean enabled() {
         try {
@@ -60,56 +78,18 @@ final class NativeNetworkLease {
                 for (Method method : loader.loadClass("boe").getDeclaredMethods()) {
                     if (!method.getName().equals(phase)) continue;
                     entry.hook(method).intercept(chain -> {
-                        Log.i(TAG, "NATIVE_PREPARE enter " + phase);
+                        entry.log(Log.INFO, TAG, "NATIVE_PREPARE enter " + phase);
                         Object result = chain.proceed();
-                        Log.i(TAG, "NATIVE_PREPARE return " + phase + " result=" + result);
+                        entry.log(Log.INFO, TAG, "NATIVE_PREPARE return " + phase + " result=" + result);
                         return result;
                     });
                 }
             }
         } catch (Throwable failure) { Log.w(TAG, "NATIVE_CHANNEL preparation adaptation unavailable", failure); }
-        try {
-            Class<?> controller = loader.loadClass("boe");
-            Method prepare = controller.getDeclaredMethod("l", List.class,
-                    loader.loadClass("bne"), loader.loadClass("dcz"));
-            Field channels = controller.getField("o");
-            Field running = controller.getDeclaredField("H");
-            running.setAccessible(true);
-            Object unit = loader.loadClass("dbm").getField("a").get(null);
-            Method wifiAdmission = loader.loadClass("qe").getDeclaredMethod("n",
-                    android.net.wifi.WifiManager.class, android.content.Context.class,
-                    loader.loadClass("dcz"));
-            entry.hook(wifiAdmission).intercept(chain -> {
-                Object continuation = chain.getArg(2);
-                String caller = continuation == null ? "" : continuation.getClass().getName();
-                if ((caller.equals("bmh") || caller.equals("bmg")) && realSessionReady()) {
-                    entry.log(Log.INFO, TAG, "NATIVE_PREPARE controller admission reuses verified active network");
-                    return unit;
-                }
-                return chain.proceed();
-            });
-            entry.hook(prepare).intercept(chain -> {
-                List<?> requestedChannels = (List<?>) chain.getArg(0);
-                entry.log(Log.INFO, TAG, "NATIVE_PREPARE enter channels=" + requestedChannels
-                        + " ready=" + realSessionReady());
-                if (java.util.Collections.singletonList(149).equals(requestedChannels) && realSessionReady()) {
-                    // The lease has already started the actual daemon and registered
-                    // the actual interface. Let the stock state machine reuse that
-                    // resource instead of waiting for unrelated Wi-Fi/AP shutdown.
-                    Object current = chain.getThisObject();
-                    Object slot = channels.get(current);
-                    slot.getClass().getMethod("c", Object.class).invoke(slot,
-                            java.util.Collections.singletonList(149));
-                    running.setBoolean(current, true);
-                    entry.log(Log.INFO, TAG, "NATIVE_PREPARE reused verified active mosey0 channel=149");
-                    return unit;
-                }
-                return chain.proceed();
-            });
-            entry.log(Log.INFO, TAG, "NATIVE_PREPARE active lease reuse installed");
-        } catch (Throwable failure) {
-            entry.log(Log.ERROR, TAG, "NATIVE_PREPARE active lease reuse unavailable", failure);
-        }
+        // A live interface is not a completed controller start. In particular,
+        // boe.l also configures the daemon, registers its network and enqueues
+        // the completion event. Let the original coroutine finish every time.
+        entry.log(Log.INFO, TAG, "NATIVE_PREPARE preserving stock startup and completion");
         // The old diagnostics searched only no-argument methods, missing the
         // actual stop RPC c(StopParams). Guard only our explicit native lease.
         for (String[] spec : new String[][]{{"buj", "bum"}, {"cmr", "cmu"}}) {

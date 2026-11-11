@@ -85,6 +85,7 @@ final class ReceiveController {
                 Object result = chain.proceed();
                 ((java.io.PrintWriter) chain.getArg(1)).println("OPAIRSHARE_RECEIVE busy=" + (IncomingReceiver.busy() || ProviderApi.hasOutgoing() ? 1 : 0));
                 ((java.io.PrintWriter) chain.getArg(1)).println("OPAIRSHARE_HISTORY state=" + TransferHistoryHooks.state());
+                if (modern) ((java.io.PrintWriter) chain.getArg(1)).println("OPAIRSHARE_NATIVE " + NativeNetworkLease.diagnostics());
                 if (!modern) ((java.io.PrintWriter) chain.getArg(1)).println("OPAIRSHARE_DISCOVERY " + DiscoveryController.status(ProviderHolder.get()));
                 ((java.io.PrintWriter) chain.getArg(1)).println("OPAIRSHARE_MODE switch_ready=" + (switchReady() ? 1 : 0));
                 return result;

@@ -37,7 +37,7 @@ KernelSU 中统一显示 **OPAirDrop PME110**，模块 ID 为 `opairshare_pme110
 ## 安装与升级
 
 1. 保留当前已能互传的环境，确认 Mosey 27391、LSPosed 桥接及两个作用域已启用。
-2. 在 KernelSU 安装 Releases 的 `OPAirDrop-PME110-v1.1.3-migration.zip`。
+2. 在 KernelSU 安装 Releases 的 `OPAirDrop-PME110-v1.1.4-migration.zip`。
 3. 安装器检查精确设备和内核、包内 SHA256、系统分包及原厂服务哈希，再从本机导入。
 4. 三个旧模块与桥接 APK 备份到 `/data/adb/opairshare_pme110/backups/`，路径记录在 `latest-backup`。
 5. 完成后旧模块标记为停用并待移除，在下一次启动由 KernelSU 完成替换。
