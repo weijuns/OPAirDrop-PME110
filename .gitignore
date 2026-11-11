@@ -21,6 +21,13 @@ local.properties
 *.dex
 *.class
 *.log
+/module/licenses/
+/module/gms/
+/module/runtime/
+*.jks
+*.p12
+*.keystore
+*.password
 
 # Local investigation notes, plans and verification records
 /docs/*DIAGNOSIS*.md

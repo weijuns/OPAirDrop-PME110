@@ -102,7 +102,7 @@ public final class OPAirShareLSPosed {
                 return;
             }
             // A consistent SQLite backup includes committed WAL records; cp would not.
-            Path backup = Path.of("/data/adb/opairshare/lsposed-before-activation-" + System.currentTimeMillis() + ".db");
+            Path backup = Path.of("/data/adb/opairshare_pme110/lsposed-before-activation-" + System.currentTimeMillis() + ".db");
             db.execSQL("VACUUM INTO " + quote(backup.toString()));
             Files.setPosixFilePermissions(backup, java.nio.file.attribute.PosixFilePermissions.fromString("rw-------"));
             db.beginTransaction();

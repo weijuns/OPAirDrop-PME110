@@ -1,5 +1,17 @@
 # 第三方声明
 
+## PME110 分支与原作者
+
+PME110 分支由 [weijuns](https://github.com/weijuns) 维护，直接基于
+**TimelessU / Weverses 的 [OPAirDrop](https://github.com/Weverses/OPAirDrop)**。
+感谢原作者的 OShare 桥接、收发界面、WebUI 及部署研究；保留上游历史、版权和 GPLv3 许可。
+修改包括 MT6993 原厂 Wonder 绑定、Mosey 27391 适配、发现恢复、发送暂存文件读取、
+模块迁移、设置后端和关于页。内核绑定按 GPL-2.0-only 单独提供。
+
+感谢 34306 / AirDropVivoCN 的运行时绑定研究及 fei-ke 的 Unlock CN GMS 方案。
+PME110 发布包使用 OPAirDrop 的 feature 过滤代码，不携带未声明许可的原 GMS 模块脚本。
+厂商 APK、daemon、FFI 只在设备本地导入，不进入本分支发布包或 Git 新提交。
+
 本文件列出仓库包含或构建时使用的主要第三方代码。原文件中的版权和许可声明随代码保留。
 
 ## 研究与部署参考

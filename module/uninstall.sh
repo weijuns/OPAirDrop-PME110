@@ -1,6 +1,4 @@
 #!/system/bin/sh
-MODDIR=${0%/*}
-if /system/bin/sh "$MODDIR/bin/control.sh" stop; then
-    /system/bin/sh "$MODDIR/bin/callback.sh" restore || true
-fi
-echo '请重启以移除挂载；系统分区及固件未被刷写。'
+# SPDX-License-Identifier: GPL-3.0-only
+# Do not tear down the active radio, remove shared packages, or delete backups.
+echo 'OPAirDrop PME110 removed. Backups retained in /data/adb/opairshare_pme110.'

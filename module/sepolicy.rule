@@ -1,0 +1,21 @@
+# Existing working PME110 policy, consolidated without additional domains or permissions.
+allow ksu mosey_service service_manager { add find };
+allow ksu servicemanager binder { call transfer };
+allow servicemanager ksu binder { call transfer };
+allow mosey_app ksu binder { call transfer };
+allow mosey_app ksu fd use;
+allow mosey_app mosey_service service_manager find;
+
+allow ksu mosey_server_exec file { read open execute execute_no_trans map getattr };
+allow ksu system_file file { read open execute execute_no_trans map getattr };
+allow ksu adb_data_file file { read open execute execute_no_trans map getattr };
+
+allow priv_app mosey_service service_manager find;
+allow priv_app ksu binder { call transfer };
+allow priv_app ksu fd use;
+allow ksu priv_app binder { call transfer };
+
+allow untrusted_app mosey_service service_manager find;
+allow untrusted_app ksu binder { call transfer };
+allow untrusted_app ksu fd use;
+allow ksu untrusted_app binder { call transfer };

@@ -1,7 +1,7 @@
-id=opairshare
-name=OPAirDrop
-version=1.0.31
-versionCode=10034
-author=TimelessU
-description=为 Oplus sun 平台设备开启 AirDrop，需要开启 Google 服务使用
-updateJson=https://github.com/Weverses/OPAirDrop/releases/latest/download/update.json
+id=opairshare_pme110
+name=OPAirDrop PME110
+version=1.1.0
+versionCode=10100
+author=weijuns
+description=PME110 MT6993 一体化 AirDrop：GMS 解锁、Mosey 系统层、MTK Wonder、OShare 桥接。感谢 TimelessU / Weverses、34306、fei-ke。
+updateJson=https://github.com/weijuns/OPAirDrop-PME110/releases/latest/download/update.json

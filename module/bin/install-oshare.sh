@@ -3,7 +3,7 @@
 set -u
 BASE=${1:?module directory required}
 PHASE=${2:-install}
-STATE=/data/adb/opairshare
+STATE=/data/adb/opairshare_pme110
 DB=/data/adb/lspd/config/modules_config.db
 PKG=com.tlsu.oshareairdrop
 APK="$BASE/companion/OShareAirDrop.apk"
@@ -64,6 +64,11 @@ fi
 installed=$(/system/bin/pm path --user 0 "$PKG" 2>/dev/null | sed -n 's/^package://p')
 case "$installed" in /data/app/*/base.apk) ;; *) echo '无法确定已安装的 OShare APK 路径'; exit 1;; esac
 [ -f "$DB" ] || { echo 'LSPosed 配置尚未创建，已安排下次开机重试。'; exit 10; }
+if CLASSPATH="$BASE/payload/native/lsposed-setup.jar" /system/bin/app_process /system/bin OPAirShareLSPosed --check "$DB" "$installed" 2>/dev/null | grep -q 'enabled=1 scopes=2 apkMatches=1'; then
+    rm -f "$STATE/oshare-setup-pending" "$STATE/oshare-setup-attempts"
+    echo 'OShare 桥接已启用，两个作用域与 APK 路径均正确。'
+    exit 0
+fi
 if CLASSPATH="$BASE/payload/native/lsposed-setup.jar" /system/bin/app_process /system/bin OPAirShareLSPosed "$DB" "$installed" >> "$STATE/oshare-install.log" 2>&1; then
     rm -f "$STATE/oshare-setup-pending" "$STATE/oshare-setup-attempts"
     echo 'OShare 已安装并启用，作用域：OShare、Mosey（主用户）。'

@@ -19,6 +19,7 @@ final class ReceiveController {
     private static boolean previousListening;
     private static String oldDownloadDirectory;
     private static Method advertise;
+    private static boolean modern;
     private static long nextRetry;
     private static String advertisedName = "";
     private ReceiveController() {}
@@ -28,9 +29,10 @@ final class ReceiveController {
         ArrayList<HookHandle> handles = new ArrayList<>();
         try {
             ShareMode mode = ShareModeRuntime.initialize(context);
-            Class<?> controller = loader.loadClass("cad");
-            Class<?> options = loader.loadClass("apj");
-            advertise = controller.getDeclaredMethod("f", options, loader.loadClass("aqa"));
+            modern = Mosey27391.supported(loader);
+            Class<?> controller = loader.loadClass(modern ? "bpo" : "cad");
+            Class<?> options = loader.loadClass(modern ? "aib" : "apj");
+            advertise = controller.getDeclaredMethod("f", options, loader.loadClass(modern ? "ais" : "aqa"));
             advertise.setAccessible(true);
             handles.add(module.hook(advertise).intercept(chain -> {
                 Integer disabled = ShareModeRuntime.result("f");
@@ -42,7 +44,7 @@ final class ReceiveController {
                 }
                 return chain.proceed();
             }));
-            handles.add(module.hook(controller.getDeclaredMethod("j", options)).intercept(chain -> {
+            handles.add(module.hook(controller.getDeclaredMethod(modern ? "i" : "j", options)).intercept(chain -> {
                 Integer disabled = ShareModeRuntime.result("j");
                 if (disabled != null) return disabled;
                 if (INTERNAL.get()) return chain.proceed();
@@ -52,7 +54,7 @@ final class ReceiveController {
                 }
                 return chain.proceed();
             }));
-            handles.add(module.hook(controller.getDeclaredMethod("h")).intercept(chain -> {
+            handles.add(module.hook(controller.getDeclaredMethod(modern ? "g" : "h")).intercept(chain -> {
                 Integer disabled = ShareModeRuntime.result("h");
                 if (disabled != null) return disabled;
                 if (INTERNAL.get()) return chain.proceed();
@@ -65,7 +67,7 @@ final class ReceiveController {
             // Keep incoming text files byte-for-byte as files. Stock Mosey converts
             // text/* files to TextAttachment and deletes the original after COMPLETE.
             // Attachment IDs limit this change to the task owned by this receiver.
-            handles.add(module.hook(loader.loadClass("sb").getDeclaredMethod("q", loader.loadClass("buq"))).intercept(chain -> {
+            if (!modern) handles.add(module.hook(loader.loadClass("sb").getDeclaredMethod("q", loader.loadClass("buq"))).intercept(chain -> {
                 if (owned) {
                     Object wrapper = chain.getArg(0);
                     java.lang.reflect.Field attachment = wrapper.getClass().getDeclaredField("b");
@@ -83,7 +85,7 @@ final class ReceiveController {
                 Object result = chain.proceed();
                 ((java.io.PrintWriter) chain.getArg(1)).println("OPAIRSHARE_RECEIVE busy=" + (IncomingReceiver.busy() || ProviderApi.hasOutgoing() ? 1 : 0));
                 ((java.io.PrintWriter) chain.getArg(1)).println("OPAIRSHARE_HISTORY state=" + TransferHistoryHooks.state());
-                ((java.io.PrintWriter) chain.getArg(1)).println("OPAIRSHARE_DISCOVERY " + DiscoveryController.status(ProviderHolder.get()));
+                if (!modern) ((java.io.PrintWriter) chain.getArg(1)).println("OPAIRSHARE_DISCOVERY " + DiscoveryController.status(ProviderHolder.get()));
                 ((java.io.PrintWriter) chain.getArg(1)).println("OPAIRSHARE_MODE switch_ready=" + (switchReady() ? 1 : 0));
                 return result;
             }));
@@ -145,7 +147,7 @@ final class ReceiveController {
             try {
                 if (ProviderApi.nativeReceiveBusy()) return;
                 // Remember the provider's existing destination; restore after releasing ownership.
-                java.lang.reflect.Field directory = ProviderHolder.get().getClass().getDeclaredField("k");
+                java.lang.reflect.Field directory = ProviderHolder.get().getClass().getDeclaredField(modern ? "i" : "k");
                 directory.setAccessible(true);
                 Object flow = directory.get(ProviderHolder.get());
                 Method value = flow.getClass().getMethod("b");

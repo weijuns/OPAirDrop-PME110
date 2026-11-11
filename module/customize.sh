@@ -1,63 +1,92 @@
 #!/system/bin/sh
-ui_print "- OPAirDrop v$(sed -n 's/^version=//p' "$MODPATH/module.prop")：为 Oplus sun 平台设备开启 AirDrop"
-[ "$(id -u)" = 0 ] || abort 'Root required'
-sh "$MODPATH/bin/verify.sh" "$MODPATH" >/dev/null || abort 'Payload integrity check failed'
-. "$MODPATH/bin/root-runtime.sh"
-ui_print "- Root 环境：$(root_manager)；支持管理器内置挂载或外部挂载模块"
-ui_print '- 不按元模块名称或目录拦截；重启后检查系统文件的实际挂载结果'
-. "$MODPATH/bin/compatibility.sh"
-compat_result=$(compatibility_device 2>&1) || abort "Compatibility check failed: $compat_result"
-ui_print "- 兼容性检测通过：$(getprop ro.product.model) / Oplus / sun / $(uname -r)"
-# Replacement must not merge obsolete split APKs from the earlier module.
-REPLACE="/system/system_ext/priv-app/MoseyApp"
-root_write_policy "$MODPATH" || abort 'Root SELinux policy configuration failed'
-for item in "$MODPATH"/*;do
-    [ "$item" != "$MODPATH/webroot" ] || continue
-    if [ -d "$item" ];then set_perm_recursive "$item" 0 0 0755 0644
-    else set_perm "$item" 0 0 0644;fi
+# SPDX-License-Identifier: GPL-3.0-only
+ui_print "- OPAirDrop PME110 1.1.0 · weijuns"
+ui_print "- 感谢 TimelessU / Weverses、34306、fei-ke"
+[ "$BOOTMODE" = true ] || abort "请在已启动的 Android 中通过 KernelSU 安装"
+MODDIR=$MODPATH
+. "$MODPATH/bin/common.sh"
+compatible || abort "仅支持已验证的 PME110 / MT6993 精确内核"
+(cd "$MODPATH" && sha256sum -c SHA256SUMS >/dev/null) || abort "安装包校验失败"
+/system/bin/pm path com.google.android.mosey >/dev/null 2>&1 || abort "缺少已初始化的 Mosey；请先按 README 准备设备"
+/system/bin/pm path com.tlsu.oshareairdrop >/dev/null 2>&1 || abort "此版本为现有可用环境的合并升级包，需要已启用的 OShare 桥接"
+package_info=$(/system/bin/dumpsys package com.google.android.mosey 2>/dev/null)
+printf '%s\n' "$package_info" | grep -q 'versionCode=27391 ' || abort "需要已验证的 Mosey 27391"
+[ -f /data/adb/lspd/config/modules_config.db ] || abort "需要已初始化的 LSPosed"
+# Vendor APKs and the native service stay on the owner's device. The public ZIP
+# contains our source-built bridge/driver, and imports verified local inputs.
+OLD=/data/adb/modules/mosey_pme110
+if [ -d "$OLD/product/priv-app/MoseyApp" ]; then SYS=$OLD/product
+elif [ -d "$OLD/system/product/priv-app/MoseyApp" ]; then SYS=$OLD/system/product
+elif [ -d /data/adb/modules/opairshare_pme110/product/priv-app/MoseyApp ]; then SYS=/data/adb/modules/opairshare_pme110/product
+elif [ -d /data/adb/modules/opairshare_pme110/system/product/priv-app/MoseyApp ]; then SYS=/data/adb/modules/opairshare_pme110/system/product
+else abort "找不到旧 Mosey 系统层；未更改原模块"; fi
+for relative in etc/permissions/privapp-permissions-mosey-vivo.xml etc/permissions/mosey-hiddenapi-vivo.xml etc/vintf/manifest/manifest_mosey.xml; do
+    [ -s "$SYS/$relative" ] || abort "系统层配置缺失：$relative"
 done
-for f in "$MODPATH"/bin/*.sh "$MODPATH/service.sh" "$MODPATH/post-fs-data.sh" "$MODPATH/uninstall.sh";do set_perm "$f" 0 0 0755;done
-set_perm "$MODPATH/system/system_ext/bin/mosey_server" 0 0 0755
-ui_print '- 配置内置 Unlock CN GMS v3.8'
-gms_result=$(sh "$MODPATH/bin/setup-gms.sh" "$MODPATH" 2>&1) || abort "GMS 配置生成失败：$gms_result"
-printf '%s\n' "$gms_result" | while IFS= read -r line; do ui_print "- $line"; done
-if [ -s "$MODPATH/gms-unlock/mounts.list" ]; then
-    for standalone in /data/adb/modules/com.fei_ke.unlockcngms /data/adb/modules_update/com.fei_ke.unlockcngms; do
-        if [ -d "$standalone" ]; then
-            touch "$standalone/disable"
-            ui_print '- 已停用独立 Unlock CN GMS 模块，重启后由内置版本接管'
+check_hash "$SYS/priv-app/MoseyApp/base.apk" ac3b59b776570aa673aed462bd7dbb08cc1486adea5f5f884f848230ddf6a4be || abort "Mosey 系统 APK 与已验证版本不符"
+for part in base.apk split_config.arm64_v8a.apk split_config.en.apk split_config.xxhdpi.apk; do
+    [ -f "$SYS/priv-app/MoseyApp/$part" ] || abort "Mosey 分包不完整：$part"
+done
+check_hash "$SYS/priv-app/MoseyApp/split_config.arm64_v8a.apk" cd2213488b5fa107966755c3dfcb435c85a06d94549c7965a83d5bca5932b49c || abort "arm64 分包校验失败"
+check_hash "$SYS/priv-app/MoseyApp/split_config.en.apk" 1170711ad580850869de8e52934b2331abb3ab6fd08dceb84ac986c0daf93b5f || abort "语言分包校验失败"
+check_hash "$SYS/priv-app/MoseyApp/split_config.xxhdpi.apk" a1a1f058353547ec199888124e58bbc1821a0634076effe82937a6c06a59babd || abort "资源分包校验失败"
+check_hash /data/moapp/mosey_server "$DAEMON_SHA" || abort "缺少已验证的 MTK 原厂服务；不会回退到旧 vivo 服务"
+check_hash /data/moapp/lib64/libmosey_daemon_ffi.so "$FFI_SHA" || abort "MTK FFI 校验失败"
+BACKUP=$(cat "$STATE/latest-backup" 2>/dev/null)
+case "$BACKUP" in "$STATE"/backups/*) ;; *) BACKUP=;; esac
+if [ -z "$BACKUP" ] || [ ! -f "$BACKUP/bridge.apk" ]; then
+    BACKUP="$STATE/backups/$(date +%Y%m%d-%H%M%S)-$$"
+    mkdir -p "$BACKUP"
+    chmod 0700 "$BACKUP"
+    for id in com.fei_ke.unlockcngms mosey_pme110 mosey_stack_pme110; do
+        if [ -d "/data/adb/modules/$id" ]; then
+            cp -a "/data/adb/modules/$id" "$BACKUP/" || abort "备份失败：$id"
         fi
     done
+    current_bridge=$(/system/bin/pm path com.tlsu.oshareairdrop | sed -n 's/^package://p' | head -n 1)
+    cp "$current_bridge" "$BACKUP/bridge.apk" || abort "桥接备份失败"
 fi
-mkdir -p /data/adb/opairshare
-rm -f /data/adb/opairshare/coex-off /data/adb/opairshare/coex-same149-only
-if [ ! -e /data/adb/opairshare/autostart-off ];then touch /data/adb/opairshare/autostart;fi
-# Preserve explicit compatibility profiles. Otherwise select the fast profile.
-if [ ! -e /data/adb/opairshare/turbo-off ] && [ ! -e /data/adb/opairshare/turbo-vht ] && [ ! -e /data/adb/opairshare/turbo-on ]; then
-    touch /data/adb/opairshare/turbo-fast
-fi
-rm -f /data/adb/opairshare/disabled /data/adb/opairshare/startup-incomplete
-ui_print '- Reboot once; the driver/native service starts automatically'
-ui_print '- Fast profile is the default; compatibility fallback: su -c "sh /data/adb/modules/opairshare/bin/turbo.sh off"'
-ui_print '- AirDrop background receive follows the selected sharing mode and Wi-Fi coexistence policy'
-ui_print '- Original signed APKs stay in system; callback APK mounts after boot; no firmware or partition writes'
-ui_print '- RX re-arms after real vdev delete and normal teardown; uncertain states quarantine'
-
-set_perm "$MODPATH/payload/native/opairshare-socket-buffer" 0 0 0755
-set_perm "$MODPATH/bin/turbo.sh" 0 0 0755
-
-# Earlier releases used a different ID; only one driver owner may start at boot.
-for legacy_dir in /data/adb/modules/"op""13-quickshare-wondertap" /data/adb/modules_update/"op""13-quickshare-wondertap"; do
-    if [ -d "$legacy_dir" ]; then
-        touch "$legacy_dir/disable"
-        ui_print '- 已停用旧版 AirDrop 模块，重启后由 OPAirDrop 接管'
+# Also clean the exact stale link if upgrading a previously staged prototype.
+for generated in "$MODPATH/product/product" "$MODPATH/system/product/product"; do
+    if [ -L "$generated" ]; then
+        [ "$(readlink "$generated")" = ./system/product ] || abort "发现未识别的嵌套分区链接"
+        rm "$generated" || abort "无法清理旧的嵌套分区链接"
     fi
 done
-
-ui_print '- 检测 LSPosed 并安装、激活 OShare Xposed 模块'
-oshare_result=$(sh "$MODPATH/bin/install-oshare.sh" "$MODPATH" install 2>&1)
-oshare_status=$?
-printf '%s\n' "$oshare_result" | while IFS= read -r line; do ui_print "- $line"; done
-[ "$oshare_status" = 0 ] || ui_print '- OShare 配置尚未完成，重启后将自动重试；请查看 /data/adb/opairshare/oshare-install.log'
-
-ui_print '- Open module WebUI for settings, status and logs'
+mkdir -p "$MODPATH/system/product" "$MODPATH/runtime/lib64"
+# Metamodules leave partition links in old trees; import only owned files,
+# never recursively copy that generated layout into a new partition.
+for relative in etc/permissions/privapp-permissions-mosey-vivo.xml etc/permissions/mosey-hiddenapi-vivo.xml etc/vintf/manifest/manifest_mosey.xml priv-app/MoseyApp/base.apk priv-app/MoseyApp/split_config.arm64_v8a.apk priv-app/MoseyApp/split_config.en.apk priv-app/MoseyApp/split_config.xxhdpi.apk; do
+    mkdir -p "$MODPATH/system/product/${relative%/*}"
+    cp "$SYS/$relative" "$MODPATH/system/product/$relative" || abort "导入系统层失败：$relative"
+done
+cp /data/moapp/mosey_server "$MODPATH/runtime/mosey_server" || abort "导入原厂服务失败"
+cp /data/moapp/lib64/libmosey_daemon_ffi.so "$MODPATH/runtime/lib64/" || abort "导入 FFI 失败"
+# Preserve GMS policy by regenerating copies of known configuration files only.
+sh "$MODPATH/bin/gms.sh" prepare "$MODPATH" || abort "GMS 配置准备失败"
+set_perm_recursive "$MODPATH" 0 0 0755 0644
+for f in "$MODPATH"/*.sh "$MODPATH"/bin/*.sh "$MODPATH/runtime/mosey_server"; do
+    set_perm "$f" 0 0 0755
+done
+CFG=/data/adb/hybrid-mount/config.toml
+if [ -f "$CFG" ] && ! grep -q '^\[rules.opairshare_pme110\]' "$CFG"; then
+    cp "$CFG" "$BACKUP/hybrid-mount-config.toml" || abort "挂载配置备份失败"
+    printf '\n[rules.opairshare_pme110]\ndefault_mode = "magic"\n' >> "$CFG" || abort "挂载配置写入失败"
+fi
+printf '%s\n' "$BACKUP" > "$STATE/latest-backup"
+# The old stack's uninstaller kills every mosey_server, including the new stock
+# daemon. Preserve it in the backup and retire that obsolete cleanup hook first.
+legacy_uninstall=/data/adb/modules/mosey_stack_pme110/uninstall.sh
+if [ -f "$legacy_uninstall" ]; then
+    mv "$legacy_uninstall" "$legacy_uninstall.pre-unify" || abort "无法停用旧版全局服务清理脚本"
+fi
+# Existing mounts and processes remain intact for this boot. KernelSU retires
+# only these three replaced modules on the next boot; dependencies stay enabled.
+for id in com.fei_ke.unlockcngms mosey_pme110 mosey_stack_pme110; do
+    if [ -d "/data/adb/modules/$id" ]; then
+        touch "/data/adb/modules/$id/disable" "/data/adb/modules/$id/remove"
+    fi
+done
+ui_print "- 已备份旧模块：$BACKUP"
+ui_print "- 合并包已暂存；当前运行会话继续使用已验证配置"
+ui_print "- 不会自动重启。临时 root 会随重启失效，先保留本次会话"

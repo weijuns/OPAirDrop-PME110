@@ -117,6 +117,10 @@ public final class OShareBridge {
                     connecting = false;
                 }
                 activity = new WeakReference<>(current);
+                // The page can clear/recreate its list without a matching
+                // discover_stop transition. Request a fresh target snapshot
+                // on every resume even if the physical scan is still shared.
+                discoveryRequested = false;
                 OShareAppearance.renameSection(current);
                 StartupTrace.mark("SHARE_PAGE_RESUMED");
                 MAIN.post(OShareBridge::syncSession);
@@ -272,8 +276,10 @@ public final class OShareBridge {
             Log.i(TAG, "Bridge boot requested generation=" + generation);
             MAIN.postDelayed(() -> checkConnection(generation, 0), 2000);
         } catch (android.content.ActivityNotFoundException unavailable) {
-            if (attempt < 4) MAIN.postDelayed(() -> boot(current, generation, attempt + 1), 1500);
-            else { connecting = false; failPending("AirDrop 服务未启用"); toast("AirDrop 服务未启用，请启动底层模块"); }
+            // Mosey 27391 removed MoseyPermissionActivity. The warm BRIDGE_CONNECT broadcast is
+            // enough when the provider process is already running (module service starts it).
+            Log.w(TAG, "Mosey boot activity unavailable; retrying warm connect");
+            MAIN.postDelayed(() -> checkConnection(generation, 0), 500);
         } catch (Throwable failure) {
             connecting = false;
             failPending("AirDrop 服务启动失败");
@@ -284,7 +290,7 @@ public final class OShareBridge {
 
     private static void checkConnection(int generation, int check) {
         if (!pending(generation)) return;
-        if (check == 4) {
+        if (check == 10) {
             connecting = false;
             Log.w(TAG, "Bridge timeout generation=" + generation + " attached=" + bridgeAttached);
             failPending("AirDrop 服务尚未就绪，请重新发送");
@@ -324,10 +330,14 @@ public final class OShareBridge {
             return true;
         }
         if (message.what == BridgeMessenger.MSG_HELLO) {
-            if (message.replyTo == null || !connectionWanted()) {
-                StartupTrace.mark(message.replyTo == null ? "SHARE_HELLO_NO_CHANNEL" : "SHARE_HELLO_NOT_WANTED");
+            if (message.replyTo == null) {
+                StartupTrace.mark("SHARE_HELLO_NO_CHANNEL");
                 return true;
             }
+            // Record the replacement provider channel even while the page is
+            // closed. No discovery starts until syncSession sees UI demand.
+            // Rejecting the idle HELLO left queued events on an obsolete
+            // channel after the provider process was replaced.
             boolean reconnected = server == null || !server.getBinder().equals(message.replyTo.getBinder());
             if (!reconnected && !connecting) return true;
             if (reconnected) {

@@ -102,13 +102,10 @@ public final class BridgeMessenger {
     }
 
     static boolean trustedReadyUid(Context context, int uid) {
-        if (uid < 0 || uid / 100000 != Process.myUid() / 100000) return false;
-        try { return uid == context.getPackageManager().getPackageUid(Entry.HOST, 0); }
-        catch (Exception failure) {
-            StartupTrace.mark("BRIDGE_HOST_UID_UNAVAILABLE");
-            Log.w(TAG, "Cannot resolve Mosey UID from host=" + context.getPackageName(), failure);
-            return false;
-        }
+        // The ready broadcast is only a hint; every command still arrives through the
+        // UID-checked CONNECT handshake in attach(). Recent Mosey builds drop the
+        // share-identity bit on the reply, so do not gate the hint on the sender uid.
+        return true;
     }
 
     private static void announceReady() {

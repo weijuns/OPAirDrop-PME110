@@ -89,7 +89,7 @@ onBeforeUnmount(()=>{if(timer)clearInterval(timer);document.removeEventListener(
      <MiuixBasicComponent title="QuickShare"><template #end><MiuixText>{{state?serviceNames[state.quickshare]||'未知':'读取中'}}</MiuixText></template></MiuixBasicComponent>
      <MiuixBasicComponent title="OShare"><template #end><MiuixText>{{state?serviceNames[state.oshare]||'未知':'读取中'}}</MiuixText></template></MiuixBasicComponent>
     </MiuixCard>
-    <MiuixSmallTitle text="速度记录"/>
+    <MiuixSmallTitle text="速度记录（尚未接入）"/>
     <MiuixCard><div class="speed-panel">
      <div class="record-heading"><b>实时传输</b><span class="record-badge" :class="{active:recording}">{{recording?'正在记录':recorderOn?'等待传输':'等待服务'}}</span></div>
      <div class="speed-values"><div><span class="direction">↑ 发送</span><div class="speed-number">{{recorderOn?speed(live?.tx_bps):'—'}}</div><span class="speed-unit">MB/s</span></div><div><span class="direction">↓ 接收</span><div class="speed-number">{{recorderOn?speed(live?.rx_bps):'—'}}</div><span class="speed-unit">MB/s</span></div></div>

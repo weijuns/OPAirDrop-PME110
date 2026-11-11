@@ -100,6 +100,42 @@ public final class ProviderApi {
         return p;
     }
 
+    /** True when the host is Mosey 1.0.927074190 (versionCode 27391) or a rename-compatible build. */
+    private static boolean modern() {
+        try {
+            return Mosey27391.supported(cl());
+        } catch (Throwable ignored) {
+            return false;
+        }
+    }
+
+    static Object wrapperTarget(Object wrapper) {
+        try {
+            return field(wrapper, "a");
+        } catch (Throwable ignored) {
+            return null;
+        }
+    }
+
+    static void targetFound(Object target) { onTargetFound(target); }
+
+    static void targetLost(Object target) { onTargetLost(target); }
+
+    static void targetUpdated(Object target) {
+        try {
+            long id = longField(target, "a");
+            TARGETS.put(id, target);
+            JSONObject json = targetJson(target);
+            json.put("id", id);
+            emit("target_updated", json);
+        } catch (Throwable ignored) {
+        }
+    }
+
+    static Object transferEvent(Object[] args) {
+        return handleTransferCallback("a", args);
+    }
+
     private static Class<?> cls(String name) {
         try {
             return Class.forName(name, false, cl());
@@ -259,6 +295,7 @@ public final class ProviderApi {
                     OUTGOING_TARGETS.remove(lease);
                     completedCache = lease.resource;
                 }
+                OwnedOutgoingFiles.release(completedCache);
                 deleteTree(completedCache);
             }
         }
@@ -332,11 +369,20 @@ public final class ProviderApi {
             for (Object target : TARGETS.values()) onTargetFound(target);
             return;
         }
-        Object options = newInstance("apk",
-                new Class<?>[]{int.class, boolean.class, boolean.class, String.class},
-                1, false, false, "OPAirShare");
-        int code = invokeInt("g",
-                new Class<?>[]{cls("aps"), cls("apk")}, ensureDiscoveryCallback(), options);
+        int code;
+        if (modern()) {
+            try {
+                code = Mosey27391.startDiscovery(cl(), provider());
+            } catch (Throwable failure) {
+                throw new IllegalStateException("startDiscovery(27391) failed", failure);
+            }
+        } else {
+            Object options = newInstance("apk",
+                    new Class<?>[]{int.class, boolean.class, boolean.class, String.class},
+                    1, false, false, "OPAirShare");
+            code = invokeInt("g",
+                    new Class<?>[]{cls("aps"), cls("apk")}, ensureDiscoveryCallback(), options);
+        }
         if (code != 0) throw new IllegalStateException("startDiscovery returned " + code);
         discovering = true;
         try {
@@ -354,7 +400,16 @@ public final class ProviderApi {
 
     private static void haltDiscovery() {
         if (!discovering) return;
-        int code = invokeInt("i", new Class<?>[]{});
+        int code;
+        if (modern()) {
+            try {
+                code = Mosey27391.stopDiscovery(provider());
+            } catch (Throwable failure) {
+                throw new IllegalStateException("stopDiscovery(27391) failed", failure);
+            }
+        } else {
+            code = invokeInt("i", new Class<?>[]{});
+        }
         if (code != 0) throw new IllegalStateException("stopDiscovery returned " + code);
         discovering = false;
         try {
@@ -376,9 +431,18 @@ public final class ProviderApi {
     }
 
     static synchronized void updateOwnedAdvertising(String name) {
-        Object options = newInstance("apj", new Class<?>[]{int.class, String.class, boolean.class, boolean.class},
-                0, name, true, false);
-        int code = invokeInt("j", new Class<?>[]{cls("apj")}, options);
+        int code;
+        if (modern()) {
+            try {
+                code = Mosey27391.updateAdvertising(cl(), provider(), name);
+            } catch (Throwable failure) {
+                throw new IllegalStateException("updateAdvertising(27391) failed", failure);
+            }
+        } else {
+            Object options = newInstance("apj", new Class<?>[]{int.class, String.class, boolean.class, boolean.class},
+                    0, name, true, false);
+            code = invokeInt("j", new Class<?>[]{cls("apj")}, options);
+        }
         if (code != 0) throw new IllegalStateException("updateAdvertising returned " + code);
         emit("advertising_updated", new JSONObject());
     }
@@ -392,11 +456,20 @@ public final class ProviderApi {
     public static synchronized void startAdvertising(String name) {
         if (advertising) return;
         String deviceName = name == null || name.isEmpty() ? "OPAirShare" : name;
-        Object options = newInstance("apj",
-                new Class<?>[]{int.class, String.class, boolean.class, boolean.class},
-                0, deviceName, true, false);
-        int code = invokeInt("f",
-                new Class<?>[]{cls("apj"), cls("aqa")}, options, ensureTransferCallback());
+        int code;
+        if (modern()) {
+            try {
+                code = Mosey27391.startAdvertising(cl(), provider(), deviceName);
+            } catch (Throwable failure) {
+                throw new IllegalStateException("startAdvertising(27391) failed", failure);
+            }
+        } else {
+            Object options = newInstance("apj",
+                    new Class<?>[]{int.class, String.class, boolean.class, boolean.class},
+                    0, deviceName, true, false);
+            code = invokeInt("f",
+                    new Class<?>[]{cls("apj"), cls("aqa")}, options, ensureTransferCallback());
+        }
         if (code != 0) throw new IllegalStateException("startAdvertising returned " + code);
         advertising = true;
         try {
@@ -409,7 +482,16 @@ public final class ProviderApi {
 
     public static synchronized void stopAdvertising() {
         if (!advertising) return;
-        int code = invokeInt("h", new Class<?>[]{});
+        int code;
+        if (modern()) {
+            try {
+                code = Mosey27391.stopAdvertising(provider());
+            } catch (Throwable failure) {
+                throw new IllegalStateException("stopAdvertising(27391) failed", failure);
+            }
+        } else {
+            code = invokeInt("h", new Class<?>[]{});
+        }
         if (code != 0) throw new IllegalStateException("stopAdvertising returned " + code);
         advertising = false;
         try {
@@ -431,9 +513,24 @@ public final class ProviderApi {
             parcel.setDataPosition(0);
             Parcelable.Creator<?> creator = (Parcelable.Creator<?>) type.getField("CREATOR").get(null);
             Object target = creator.createFromParcel(parcel);
-            type.getMethod("l").invoke(target);
+            // Old builds expose l(); 27391 renamed the attachment reset to k().
+            try { type.getMethod("l").invoke(target); }
+            catch (NoSuchMethodException missing) { type.getMethod("k").invoke(target); }
             return target;
         } finally { parcel.recycle(); }
+    }
+
+    private static void addAttachment(Object target, Object attachment, boolean text) throws Exception {
+        String[] candidates = text ? new String[]{"j", "k"} : new String[]{"h", "i"};
+        for (String name : candidates) {
+            try {
+                target.getClass().getMethod(name, attachment.getClass()).invoke(target, attachment);
+                return;
+            } catch (NoSuchMethodException ignored) {
+            }
+        }
+        throw new NoSuchMethodException("attachment method for "
+                + attachment.getClass().getSimpleName());
     }
 
     public static synchronized void sendContent(JSONArray uris, String text, long targetId) {
@@ -482,24 +579,29 @@ public final class ProviderApi {
                                 android.os.Bundle.class, String.class, long.class, String.class,
                                 long.class, long.class, boolean.class},
                         name, type, size, uri, null, mime, System.nanoTime(), null, 0L, 0L, false);
-                target.getClass().getMethod("i", attachment.getClass()).invoke(target, attachment);
-            }
+                addAttachment(target, attachment, false);            }
             if (text != null && !text.isEmpty()) {
                 Object attachment = newInstance("com.google.android.gms.nearby.sharing.TextAttachment",
                         new Class<?>[]{String.class, int.class, long.class, android.os.Bundle.class,
                                 String.class, long.class, boolean.class},
                         text, 0, (long) text.getBytes(StandardCharsets.UTF_8).length,
                         null, "Shared text", System.nanoTime(), false);
-                target.getClass().getMethod("k", attachment.getClass()).invoke(target, attachment);
+                addAttachment(target, attachment, true);
             }
             if (uris.length() == 0 && (text == null || text.isEmpty()))
                 throw new IllegalArgumentException("no attachments");
-            Object callback = CallbackFactory.create(cl(), "aqa",
-                    (method, args) -> handleTransferCallback(method, args, lease));
             OUTGOING_TARGETS.put(lease, target);
-            int code = invokeInt("d", new Class<?>[]{String.class,
-                    cls("com.google.android.gms.nearby.sharing.ShareTarget"), cls("aqa")},
-                    localDeviceName(), target, callback);
+            int code;
+            if (modern()) {
+                code = Mosey27391.send(cl(), provider(), localDeviceName(), target,
+                        (method, args) -> handleTransferCallback("a", args, lease));
+            } else {
+                Object callback = CallbackFactory.create(cl(), "aqa",
+                        (method, args) -> handleTransferCallback(method, args, lease));
+                code = invokeInt("d", new Class<?>[]{String.class,
+                        cls("com.google.android.gms.nearby.sharing.ShareTarget"), cls("aqa")},
+                        localDeviceName(), target, callback);
+            }
             if (code != 0) throw new IllegalStateException("send returned " + code);
             submitted = true;
             emit("send_requested", new JSONObject().put("id", targetId).put("code", code)
@@ -540,6 +642,12 @@ public final class ProviderApi {
                     int count;
                     while ((count = input.read(buffer)) != -1) output.write(buffer, 0, count);
                 }
+                if (modern()) {
+                    OutgoingTransfers.Lease<File> owner = lease;
+                    OwnedOutgoingFiles.register(file, directory, () -> OUTGOING.isCurrent(owner));
+                    // Fail before showing an invitation if the actual stock reader cannot open it.
+                    try (InputStream validation = OwnedOutgoingFiles.open(cl(), file)) { validation.read(); }
+                }
                 uris.put(Uri.fromFile(file).toString());
             }
             sendContent(uris, null, targetId, lease);
@@ -549,6 +657,7 @@ public final class ProviderApi {
         } finally {
             if (!submitted) {
                 if (lease != null) OUTGOING.finish(lease);
+                OwnedOutgoingFiles.release(directory);
                 deleteTree(directory);
             }
         }
@@ -579,6 +688,11 @@ public final class ProviderApi {
     }
 
     static boolean nativeReceiveBusy() throws Exception {
+        if (modern()) {
+            for (Object transfer : receiveTransfers().values())
+                if (!Boolean.TRUE.equals(field(field(transfer, "f"), "e"))) return true;
+            return false;
+        }
         Object receiver = field(provider(), "b");
         Object state = field(receiver, "k");
         Method get = state.getClass().getMethod("b"); get.setAccessible(true);
@@ -590,6 +704,7 @@ public final class ProviderApi {
     }
 
     static boolean receiveExists(long id) throws Exception {
+        if (modern()) return receiveTransfers().containsKey(id);
         Object receiver = field(provider(), "b");
         Object state = field(receiver, "k");
         Method get = state.getClass().getMethod("b");
@@ -599,7 +714,7 @@ public final class ProviderApi {
 
     static void receiveAction(String action, Object target) {
         int code = invokeInt(action,
-                new Class<?>[]{cls("com.google.android.gms.nearby.sharing.ShareTarget")}, target);
+                new Class<?>[]{target.getClass()}, target);
         if (code != 0) throw new IllegalStateException("receive action " + action + " returned " + code);
     }
 
@@ -607,7 +722,7 @@ public final class ProviderApi {
         Object target = TARGETS.get(targetId);
         if (target == null) throw new IllegalStateException("unknown target id " + targetId);
         int code = invokeInt("a",
-                new Class<?>[]{cls("com.google.android.gms.nearby.sharing.ShareTarget")}, target);
+                new Class<?>[]{target.getClass()}, target);
         if (code != 0) throw new IllegalStateException("accept returned " + code);
         emitCode("accepted", code);
     }
@@ -616,7 +731,7 @@ public final class ProviderApi {
         Object target = TARGETS.get(targetId);
         if (target == null) throw new IllegalStateException("unknown target id " + targetId);
         int code = invokeInt("c",
-                new Class<?>[]{cls("com.google.android.gms.nearby.sharing.ShareTarget")}, target);
+                new Class<?>[]{target.getClass()}, target);
         if (code != 0) throw new IllegalStateException("deny returned " + code);
         emitCode("denied", code);
     }
@@ -627,7 +742,7 @@ public final class ProviderApi {
         if (target == null) target = TARGETS.get(targetId);
         if (target == null) throw new IllegalStateException("unknown target id " + targetId);
         int code = invokeInt("b",
-                new Class<?>[]{cls("com.google.android.gms.nearby.sharing.ShareTarget")}, target);
+                new Class<?>[]{target.getClass()}, target);
         if (code != 0) throw new IllegalStateException("cancel returned " + code);
         emitCode("cancelled", code);
     }
@@ -639,8 +754,18 @@ public final class ProviderApi {
     }
 
     public static synchronized void setDownloadDirectory(String path) {
-        int code = invokeInt("m", new Class<?>[]{String.class}, path);
+        int code = invokeInt(modern() ? "l" : "m", new Class<?>[]{String.class}, path);
         emitCode("download_dir_set", code);
+    }
+
+    private static Map<Object, Object> receiveTransfers() throws Exception {
+        Object receiver = field(provider(), "c");
+        Object flow = field(receiver, "r");
+        Method get = flow.getClass().getMethod("b"); get.setAccessible(true);
+        Map<Object, Object> combined = new java.util.LinkedHashMap<>();
+        combined.putAll((Map<?, ?>) field(receiver, "i"));
+        combined.putAll((Map<?, ?>) get.invoke(flow));
+        return combined;
     }
 
     private static void emitCode(String type, int code) {

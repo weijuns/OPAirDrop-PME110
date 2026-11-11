@@ -7,8 +7,8 @@ export interface Config {coexist:Toggle;scope:Scope;profile:Profile;autostart:To
 export interface Status extends Config {share_mode:ShareMode;share_mode_active:ShareMode;coexist_requested?:Toggle;coexist_reason?:string;version:string;airdrop_name:string;airdrop_name_default:string;airdrop_name_custom:string;receive_directory:string;ready:Toggle;editable:Toggle;session:Toggle;frequency:string;channel:string;network:string;radio:string;matcher:string;pending:string;phy:string;mcs:string;nss:string;batch:string;collect:string;callback:Toggle;awdl:string;quickshare:string;oshare:string}
 const allowed={coexist:['on'],scope:['auto'],profile:['fast','vht','on','off'],autostart:['on','off']};
 export class ApiError extends Error {constructor(public code:number,message:string){super(message)}}
-const command='/system/bin/sh /data/adb/modules/opairshare/bin/settings.sh';
-const historyCommand='/system/bin/sh /data/adb/modules/opairshare/bin/speed-history.sh status';
+const command='/system/bin/sh /data/adb/modules/opairshare_pme110/bin/settings.sh';
+const historyCommand='/system/bin/sh /data/adb/modules/opairshare_pme110/bin/speed-history.sh status';
 let serial=0;
 export function validate(config:Config):void {for(const k of Object.keys(allowed) as (keyof Config)[]) if(!allowed[k].includes(config[k]))throw new ApiError(2,'设置值超出允许范围');}
 export function nameHex(value:string):string {

@@ -1,0 +1,29 @@
+name: PME110 source checks
+on:
+  push:
+  pull_request:
+permissions:
+  contents: read
+jobs:
+  source:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.11'
+      - name: Check shell syntax and installer migration
+        run: |
+          for f in module/*.sh module/bin/*.sh; do sh -n "$f"; done
+          python3 tests/pme110/test_migration.py
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '22'
+          cache: npm
+          cache-dependency-path: webui/package-lock.json
+      - name: Check and build WebUI
+        working-directory: webui
+        run: |
+          npm ci
+          npm run check
+          npm run build
