@@ -16,6 +16,7 @@ jobs:
         run: |
           for f in module/*.sh module/bin/*.sh; do sh -n "$f"; done
           python3 tests/pme110/test_migration.py
+          python3 tests/pme110/test_runtime_apk.py
       - uses: actions/setup-node@v4
         with:
           node-version: '22'

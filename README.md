@@ -37,7 +37,7 @@ KernelSU 中统一显示 **OPAirDrop PME110**，模块 ID 为 `opairshare_pme110
 ## 安装与升级
 
 1. 保留当前已能互传的环境，确认 Mosey 27391、LSPosed 桥接及两个作用域已启用。
-2. 在 KernelSU 安装 Releases 的 `OPAirDrop-PME110-v1.1.1-migration.zip`。
+2. 在 KernelSU 安装 Releases 的 `OPAirDrop-PME110-v1.1.3-migration.zip`。
 3. 安装器检查精确设备和内核、包内 SHA256、系统分包及原厂服务哈希，再从本机导入。
 4. 三个旧模块与桥接 APK 备份到 `/data/adb/opairshare_pme110/backups/`，路径记录在 `latest-backup`。
 5. 完成后旧模块标记为停用并待移除，在下一次启动由 KernelSU 完成替换。
@@ -61,6 +61,10 @@ root 与模块加载条件的启动中生效。重新获取临时 root 属于你
 关于页显示 **作者：weijuns**，下面列出原作者致谢与来源。
 设置通过桥接实际读取的 `Settings.Global` 保存，不再使用早期原型的独立文本文件。
 
+请保持手机 **Wi-Fi 和蓝牙开启**。底层 `mosey0` 存在或界面能发现 Mac，并不代表
+原厂发送准备条件已经满足；本次曾在 Wi-Fi 关闭时出现看得到但发送与取消卡住，
+开启后重新发送完成。不能用服务存在或接口 UP 代替实际收发验收。
+
 Mac 的接收提示由 macOS 呈现。实测曾遇到状态栏软件影响提示，关闭该软件后接收弹窗恢复；
 不应据此更换手机驱动。
 
@@ -82,6 +86,9 @@ export OPAIR_KEYSTORE=/absolute/private/release.p12
 export OPAIR_PASSWORD_FILE=/absolute/private/release.password
 export OPAIR_LINEAGE="$PWD/tools/pme110/signing-lineage.bin"
 python3 tools/pme110/build.py bridge
+python3 tools/pme110/check_runtime.py module/companion/OShareAirDrop.apk
+# 连接测试手机，实际执行不读取缓存的设备列表与接收界面解析：
+python3 tools/pme110/smoke_android.py
 
 # 按 kernel/mtk-pme110/README.md 构建精确内核绑定并复制到 module/kernel/。
 python3 tests/pme110/test_migration.py

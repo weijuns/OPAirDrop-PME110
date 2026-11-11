@@ -7,7 +7,12 @@ import android.os.IBinder;
 import android.util.Log;
 
 import java.lang.reflect.Method;
+import java.lang.reflect.Field;
 import java.net.NetworkInterface;
+import java.util.List;
+import android.net.ConnectivityManager;
+import android.net.LinkProperties;
+import android.net.Network;
 
 /** Own the explicitly requested native test session across provider state changes. */
 final class NativeNetworkLease {
@@ -44,9 +49,11 @@ final class NativeNetworkLease {
             entry.hook(channels).intercept(chain -> {
                 NetworkInterface network = NetworkInterface.getByName("mosey0");
                 if (requested && enabled() && network != null && network.isUp()) {
-                    Log.i(TAG, "NATIVE_CHANNEL preparation uses active test channel 149");
+                    entry.log(Log.INFO, TAG, "NATIVE_CHANNEL preparation uses active test channel 149");
                     return java.util.Collections.singletonList(149);
                 }
+                entry.log(Log.INFO, TAG, "NATIVE_CHANNEL stock preparation requested=" + requested
+                        + " iface=" + (network != null));
                 return chain.proceed();
             });
             for (String phase : new String[]{"c", "l"}) {
@@ -61,6 +68,48 @@ final class NativeNetworkLease {
                 }
             }
         } catch (Throwable failure) { Log.w(TAG, "NATIVE_CHANNEL preparation adaptation unavailable", failure); }
+        try {
+            Class<?> controller = loader.loadClass("boe");
+            Method prepare = controller.getDeclaredMethod("l", List.class,
+                    loader.loadClass("bne"), loader.loadClass("dcz"));
+            Field channels = controller.getField("o");
+            Field running = controller.getDeclaredField("H");
+            running.setAccessible(true);
+            Object unit = loader.loadClass("dbm").getField("a").get(null);
+            Method wifiAdmission = loader.loadClass("qe").getDeclaredMethod("n",
+                    android.net.wifi.WifiManager.class, android.content.Context.class,
+                    loader.loadClass("dcz"));
+            entry.hook(wifiAdmission).intercept(chain -> {
+                Object continuation = chain.getArg(2);
+                String caller = continuation == null ? "" : continuation.getClass().getName();
+                if ((caller.equals("bmh") || caller.equals("bmg")) && realSessionReady()) {
+                    entry.log(Log.INFO, TAG, "NATIVE_PREPARE controller admission reuses verified active network");
+                    return unit;
+                }
+                return chain.proceed();
+            });
+            entry.hook(prepare).intercept(chain -> {
+                List<?> requestedChannels = (List<?>) chain.getArg(0);
+                entry.log(Log.INFO, TAG, "NATIVE_PREPARE enter channels=" + requestedChannels
+                        + " ready=" + realSessionReady());
+                if (java.util.Collections.singletonList(149).equals(requestedChannels) && realSessionReady()) {
+                    // The lease has already started the actual daemon and registered
+                    // the actual interface. Let the stock state machine reuse that
+                    // resource instead of waiting for unrelated Wi-Fi/AP shutdown.
+                    Object current = chain.getThisObject();
+                    Object slot = channels.get(current);
+                    slot.getClass().getMethod("c", Object.class).invoke(slot,
+                            java.util.Collections.singletonList(149));
+                    running.setBoolean(current, true);
+                    entry.log(Log.INFO, TAG, "NATIVE_PREPARE reused verified active mosey0 channel=149");
+                    return unit;
+                }
+                return chain.proceed();
+            });
+            entry.log(Log.INFO, TAG, "NATIVE_PREPARE active lease reuse installed");
+        } catch (Throwable failure) {
+            entry.log(Log.ERROR, TAG, "NATIVE_PREPARE active lease reuse unavailable", failure);
+        }
         // The old diagnostics searched only no-argument methods, missing the
         // actual stop RPC c(StopParams). Guard only our explicit native lease.
         for (String[] spec : new String[][]{{"buj", "bum"}, {"cmr", "cmu"}}) {
@@ -94,6 +143,35 @@ final class NativeNetworkLease {
     static synchronized void request() {
         requested = true;
         reconcile();
+        // This runs on OShareAutoDiscovery, never the UI thread. Wait for the
+        // daemon's asynchronous interface creation and network registration
+        // before discovery queues a stock controller preparation coroutine.
+        long deadline = android.os.SystemClock.elapsedRealtime() + 6000;
+        while (enabled() && !realSessionReady()
+                && android.os.SystemClock.elapsedRealtime() < deadline) {
+            try { Thread.sleep(100); }
+            catch (InterruptedException interrupted) { Thread.currentThread().interrupt(); break; }
+            reconcile();
+        }
+        if (Entry.instance != null) Entry.instance.log(Log.INFO, TAG,
+                "NATIVE_LEASE admission ready=" + realSessionReady());
+    }
+
+    private static boolean realSessionReady() {
+        if (!requested || !enabled() || client == null) return false;
+        try {
+            IBinder service = (IBinder) Class.forName("android.os.ServiceManager")
+                    .getMethod("checkService", String.class).invoke(null, SERVICE);
+            NetworkInterface iface = NetworkInterface.getByName("mosey0");
+            if (service == null || !service.isBinderAlive() || iface == null || !iface.isUp()
+                    || iface.getInterfaceAddresses().isEmpty()) return false;
+            ConnectivityManager manager = HostContext.get().getSystemService(ConnectivityManager.class);
+            for (Network network : manager.getAllNetworks()) {
+                LinkProperties properties = manager.getLinkProperties(network);
+                if (properties != null && "mosey0".equals(properties.getInterfaceName())) return true;
+            }
+        } catch (Throwable failure) { Log.w(TAG, "NATIVE_PREPARE lease readiness failed", failure); }
+        return false;
     }
 
     private static synchronized void reconcile() {

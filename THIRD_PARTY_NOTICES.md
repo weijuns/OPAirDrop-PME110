@@ -107,6 +107,10 @@ libxposed API 使用 Apache-2.0，LSPosed 使用 GPL-3.0。KernelSU 的 kernel �
 
 - [DexKit](https://github.com/LuckyPray/DexKit)，Maven 坐标 `org.luckypray:dexkit:2.3.0`，用于 OShare DEX 特征定位。未修改依赖；AAR 随桥接 APK 打包。该版本 POM 声明 LGPL-3.0 与 Apache-2.0，来源：[Maven Central](https://repo.maven.apache.org/maven2/org/luckypray/dexkit/2.3.0/)。
 - Kotlin 标准库 `org.jetbrains.kotlin:kotlin-stdlib:2.2.21`，Apache-2.0。
+- PME110 构建显式包含 `com.google.flatbuffers:flatbuffers-java:23.5.26`，Apache-2.0，
+  对应原文保留在 `LICENSES/third-party/flatbuffers.txt`；以及 Kotlin 所需的
+  `org.jetbrains:annotations:13.0`，Apache-2.0。DexKit 的 `cxx:1.2.0` 为静态 prefab 构建输入，
+  不是应额外复制到 APK 的动态 JNI 库。来源及下载哈希固定在 `tools/pme110/build.py`。
 - DexKit 的传递依赖包括 FlatBuffers Java `23.5.26`（Apache-2.0）与 Rikka NDK cxx `1.2.0`（对应依赖的 LLVM / libc++ 许可适用）。具体构建依赖以 Gradle 解析结果为准。
 
 [LGPLv3 条款](LICENSES/LGPL-3.0.txt) · [Apache 2.0 条款](LICENSES/Apache-2.0.txt)。DexKit 对应版本源码与原有版权声明由上游项目提供；项目未把厂商 APK 或分析样本纳入分发。

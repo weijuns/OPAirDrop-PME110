@@ -9,6 +9,7 @@ import shutil
 import subprocess
 import urllib.request
 import zipfile
+from check_runtime import verify_runtime_apk
 
 ROOT = Path(__file__).resolve().parents[2]
 PROPS = dict(line.split('=', 1) for line in (ROOT/'module/module.prop').read_text().splitlines() if '=' in line)
@@ -17,6 +18,10 @@ DEPS = {
     'api.aar': ('https://repo.maven.apache.org/maven2/io/github/libxposed/api/102.0.0/api-102.0.0.aar', '423484a6e1807e7a423c4b88fcd8176d104318259d91791877fed88fe91479d0'),
     'dexkit.aar': ('https://repo.maven.apache.org/maven2/org/luckypray/dexkit/2.3.0/dexkit-2.3.0.aar', '8df532c4126b58490667f71127dc57aef62ccf3578d1d17330f2a1cb8836218e'),
     'kotlin-stdlib.jar': ('https://repo.maven.apache.org/maven2/org/jetbrains/kotlin/kotlin-stdlib/2.2.21/kotlin-stdlib-2.2.21.jar', '6558a3d233da56a20934b32159f9db5f86ed5816ef098f78a2c223dc6abb79dd'),
+    'flatbuffers.jar': ('https://repo.maven.apache.org/maven2/com/google/flatbuffers/flatbuffers-java/23.5.26/flatbuffers-java-23.5.26.jar', '8d10cac2ea9878896077ba437d76fdb1b9a07f55a863c560bb8a024b04103f8b'),
+    'annotations.jar': ('https://repo.maven.apache.org/maven2/org/jetbrains/annotations/13.0/annotations-13.0.jar', 'ace2a10dc8e2d5fd34925ecac03e4988b2c0f851650c94b8cef49ba1bd111478'),
+    # DexKit's C++ dependency is a static prefab AAR; it has no runtime JNI .so.
+    'cxx.aar': ('https://repo.maven.apache.org/maven2/dev/rikka/ndk/thirdparty/cxx/1.2.0/cxx-1.2.0.aar', 'e5e4fdab7530f1ae5601c1458265e525f05bd43f885b691ee200d800fdd731f6'),
 }
 
 
@@ -59,13 +64,14 @@ def build_bridge(args):
                       f'public static final int VERSION_CODE={CODE};'
                       f'public static final String VERSION_NAME="{VERSION}";}}')
     src = ROOT / 'oshare/app/src/main'
-    cp = os.pathsep.join(map(str, [android, work/'api.jar', work/'dexkit.jar', deps/'kotlin-stdlib.jar']))
+    runtime = [work/'dexkit.jar', deps/'kotlin-stdlib.jar', deps/'flatbuffers.jar', deps/'annotations.jar']
+    cp = os.pathsep.join(map(str, [android, work/'api.jar', *runtime]))
     run('javac', '-source', '17', '-target', '17', '-encoding', 'UTF-8', '-nowarn', '-cp', cp,
         '-d', classes, *sorted((src/'java').rglob('*.java')), config)
     jar = work / 'bridge.jar'
     run('jar', 'cf', jar, '-C', classes, '.')
     run(tools/'d8', '--release', '--min-api', '35', '--lib', android, '--output', dex,
-        jar, work/'dexkit.jar', deps/'kotlin-stdlib.jar')
+        jar, *runtime)
     run(tools/'aapt2', 'compile', '--dir', src/'res', '-o', work/'resources.zip')
     manifest = work/'AndroidManifest.xml'
     manifest.write_text((src/'AndroidManifest.xml').read_text().replace(
@@ -95,6 +101,7 @@ def build_bridge(args):
     run(*sign, work/'aligned.apk')
     run(tools/'apksigner', 'verify', '--verbose', '--print-certs', output)
     run(tools/'zipalign', '-c', '-P', '16', '4', output)
+    print(f'Runtime dependency definitions: {verify_runtime_apk(output)} classes')
     # Stock Android SQLite is used by the narrow, transaction-based installer.
     helper = work/'helper'
     helper.mkdir()
@@ -109,6 +116,7 @@ def build_bridge(args):
 
 def package():
     module = ROOT/'module'
+    verify_runtime_apk(module/'companion/OShareAirDrop.apk')
     for required in ['companion/OShareAirDrop.apk', 'kernel/mtk_wonder_bind.ko',
                      'payload/native/lsposed-setup.jar', 'webroot/index.html']:
         if not (module/required).is_file():
