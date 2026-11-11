@@ -14,3 +14,11 @@ compatible() {
     [ "$(uname -r)" = "$EXPECTED_KERNEL" ]
 }
 enabled() { [ ! -e "$MODDIR/disable" ] && [ ! -e "$MODDIR/remove" ]; }
+# Android shellCommand transfers stdout/stderr FDs to system_server. Private
+# module log files cannot be passed through Binder; capture via a pipe first.
+run_framework() {
+    framework_output=$("$@" 2>&1)
+    framework_status=$?
+    [ -z "$framework_output" ] || printf '%s\n' "$framework_output"
+    return "$framework_status"
+}

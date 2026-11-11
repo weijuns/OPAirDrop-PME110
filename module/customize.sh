@@ -1,6 +1,6 @@
 #!/system/bin/sh
 # SPDX-License-Identifier: GPL-3.0-only
-ui_print "- OPAirDrop PME110 1.1.0 · weijuns"
+ui_print "- OPAirDrop PME110 · weijuns"
 ui_print "- 感谢 TimelessU / Weverses、34306、fei-ke"
 [ "$BOOTMODE" = true ] || abort "请在已启动的 Android 中通过 KernelSU 安装"
 MODDIR=$MODPATH

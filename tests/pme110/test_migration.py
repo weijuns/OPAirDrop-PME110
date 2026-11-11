@@ -6,6 +6,7 @@ from pathlib import Path
 import re
 import shutil
 import subprocess
+import sys
 import tempfile
 import unittest
 
@@ -160,6 +161,40 @@ dumpsys() { echo 'versionCode=27391 minSdk=36'; }
         text = (ROOT/'module/customize.sh').read_text()
         for value in re.findall(r'check_hash "[^"\n]+" ([a-f0-9]+)', text):
             self.assertEqual(len(value), 64)
+
+    def test_framework_shell_uses_pipes_and_preserves_failures(self):
+        probe = 'import os,stat,sys;sys.exit(0 if all(stat.S_ISFIFO(os.fstat(fd).st_mode) for fd in (1,2)) else 42)'
+        log = self.root/'private.log'
+        with log.open('w') as output:
+            direct = subprocess.run([sys.executable, '-c', probe], stdout=output, stderr=subprocess.STDOUT)
+        self.assertEqual(direct.returncode, 42)
+        wrapper = ['sh', '-c', '. "$1"; shift; run_framework "$@"', 'probe', str(self.mod/'bin/common.sh')]
+        with log.open('w') as output:
+            captured = subprocess.run(wrapper+[sys.executable, '-c', probe], stdout=output, stderr=subprocess.STDOUT)
+        self.assertEqual(captured.returncode, 0)
+        with log.open('w') as output:
+            failed = subprocess.run(wrapper+['sh','-c','echo out; echo err >&2; exit 7'], stdout=output, stderr=subprocess.STDOUT)
+        self.assertEqual(failed.returncode, 7)
+        self.assertEqual(log.read_text(), 'out\nerr\n')
+
+    def test_retired_cache_waits_for_mount_release(self):
+        state = self.root/'data/adb/opairshare_pme110'
+        cache = state/'retired-mounts'
+        cache.mkdir(parents=True)
+        (cache/'old.apk').write_text('retired')
+        (state/'keep.settings').write_text('keep')
+        mounts = self.root/'mountinfo'
+        mounts.write_text(f'old mount root {cache}/old.apk\n')
+        env = self.environment | dict(OPAIR_RETIRED_MOUNTINFO=str(mounts))
+        command = ['sh', str(self.mod/'bin/cleanup-retired.sh')]
+        busy = subprocess.run(command, env=env, capture_output=True, text=True)
+        self.assertEqual(busy.returncode, 0, busy.stderr)
+        self.assertTrue((cache/'old.apk').exists())
+        mounts.write_text('no retired references\n')
+        released = subprocess.run(command, env=env, capture_output=True, text=True)
+        self.assertEqual(released.returncode, 0, released.stderr)
+        self.assertFalse(cache.exists())
+        self.assertEqual((state/'keep.settings').read_text(), 'keep')
 
 
 if __name__ == '__main__':

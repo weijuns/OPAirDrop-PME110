@@ -11,7 +11,8 @@ import urllib.request
 import zipfile
 
 ROOT = Path(__file__).resolve().parents[2]
-VERSION, CODE = '1.1.0', 10100
+PROPS = dict(line.split('=', 1) for line in (ROOT/'module/module.prop').read_text().splitlines() if '=' in line)
+VERSION, CODE = PROPS['version'], int(PROPS['versionCode'])
 DEPS = {
     'api.aar': ('https://repo.maven.apache.org/maven2/io/github/libxposed/api/102.0.0/api-102.0.0.aar', '423484a6e1807e7a423c4b88fcd8176d104318259d91791877fed88fe91479d0'),
     'dexkit.aar': ('https://repo.maven.apache.org/maven2/org/luckypray/dexkit/2.3.0/dexkit-2.3.0.aar', '8df532c4126b58490667f71127dc57aef62ccf3578d1d17330f2a1cb8836218e'),

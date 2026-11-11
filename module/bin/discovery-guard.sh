@@ -3,6 +3,7 @@
 # global freezer changes, or fabricated peers. Keep an existing app alive by
 # starting its existing service only after observing cached/frozen/missing state.
 MODDIR=${0%/bin/*}
+. "$MODDIR/bin/common.sh"
 BASE=/data/adb/opairshare_pme110
 mkdir -p "$BASE"
 chmod 0700 "$BASE"
@@ -103,8 +104,8 @@ while [ "$(getprop debug.opairshare.nativenet)" = 1 ] && [ ! -e "$MODDIR/disable
     if [ -n "$reason" ]; then
         echo "$(date '+%F %T') restore reason=$reason app=$app_pid adj=$adj frozen=$frozen daemon=$server_pid"
         # DURATION is milliseconds. A short admission window, not a permanent exemption.
-        cmd deviceidle tempwhitelist -u 0 -d 20000 "$APP"
-        am startservice --user 0 -n "$APP/.ExternalSharingService"
+        run_framework /system/bin/cmd deviceidle tempwhitelist -u 0 -d 20000 "$APP"
+        run_framework /system/bin/am startservice --user 0 -n "$APP/.ExternalSharingService"
     fi
     if [ "$app_pid" != "$last_app" ] || [ "$server_pid" != "$last_server" ]; then
         echo "$(date '+%F %T') processes app=$app_pid daemon=$server_pid"

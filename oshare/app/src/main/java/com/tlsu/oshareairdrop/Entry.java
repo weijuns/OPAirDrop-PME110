@@ -21,7 +21,7 @@ import io.github.libxposed.api.XposedModuleInterface;
 
 public final class Entry extends XposedModule {
     public static volatile Entry instance;
-    public static final String REVISION = "opairdrop-pme110-1.1.0-v7";
+    public static final String REVISION = "opairdrop-pme110-" + BuildConfig.VERSION_NAME + "-v7";
     public static final String TAG = "OShareAirDrop";
     public static final String HOST = "com.google.android.mosey";
     public static final String BOOT_EXTRA = "oshare_bridge_boot";

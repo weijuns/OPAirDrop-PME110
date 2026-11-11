@@ -20,6 +20,6 @@ setprop debug.opairshare.autodiscovery 1
 setprop debug.opairshare.nativenet 1
 setprop debug.opairshare.receiveonly 0
 setprop debug.opairshare.receive.ready 1
-cmd deviceidle tempwhitelist -u 0 -d 20000 com.google.android.mosey
-am startservice --user 0 -n com.google.android.mosey/.ExternalSharingService
+run_framework /system/bin/cmd deviceidle tempwhitelist -u 0 -d 20000 com.google.android.mosey || exit 1
+run_framework /system/bin/am startservice --user 0 -n com.google.android.mosey/.ExternalSharingService || exit 1
 sh "$MODDIR/bin/discovery-guard.sh" start

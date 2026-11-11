@@ -5,6 +5,7 @@ MODDIR=${0%/*}
 enabled && compatible || exit 1
 exec >> "$STATE/boot.log" 2>&1
 echo "$(date) post-fs-data"
+sh "$MODDIR/bin/cleanup-retired.sh" || echo 'Retired cache cleanup deferred.'
 check_hash "$MODDIR/runtime/mosey_server" "$DAEMON_SHA" || exit 1
 check_hash "$MODDIR/runtime/lib64/libmosey_daemon_ffi.so" "$FFI_SHA" || exit 1
 # The stock daemon has an absolute /data/moapp library path. Never replace
